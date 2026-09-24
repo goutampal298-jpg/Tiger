@@ -24,13 +24,50 @@ jobs:
         shell: bash
         run: |
           ANDROID_DIR=$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit | xargs -r dirname)
+
           if [ -z "$ANDROID_DIR" ]; then
             echo "Android project not found"
             exit 1
           fi
+
           echo "ANDROID_DIR=$ANDROID_DIR" >> "$GITHUB_ENV"
+
           SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
           echo "sdk.dir=$SDK" > "$ANDROID_DIR/local.properties"
+
+      - name: Fix Android app module
+        shell: bash
+        run: |
+          cd "$ANDROID_DIR"
+
+          echo "=== Android project ==="
+          pwd
+
+          echo "=== Project files ==="
+          find . -maxdepth 2 -type f | sort
+
+          if [ -f settings.gradle ]; then
+            echo "=== settings.gradle ==="
+            cat settings.gradle
+
+            if [ -d app ] && ! grep -qE "include[[:space:]]*['\"]:app['\"]" settings.gradle; then
+              echo "Adding :app module..."
+              echo "include ':app'" >> settings.gradle
+            fi
+          fi
+
+          if [ -f settings.gradle.kts ]; then
+            echo "=== settings.gradle.kts ==="
+            cat settings.gradle.kts
+
+            if [ -d app ] && ! grep -qE 'include[[:space:]]*\(["'\'']?:app' settings.gradle.kts; then
+              echo "Adding :app module..."
+              echo 'include(":app")' >> settings.gradle.kts
+            fi
+          fi
+
+          echo "=== App folder ==="
+          ls -la app || true
 
       - name: Set up Java
         uses: actions/setup-java@v5
@@ -43,16 +80,21 @@ jobs:
         with:
           gradle-version: '8.10'
 
-      -       - name: Inspect and Build APK
+      - name: Build debug APK
         shell: bash
         run: |
           cd "$ANDROID_DIR"
+
           echo "=== Gradle projects ==="
           gradle projects
+
           echo "=== Assemble tasks ==="
           gradle tasks --all | grep -i assemble || true
+
+          echo "=== Building APK ==="
           gradle :app:assembleDebug
-      -       - name: Upload APK
+
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: TIGER-AI-DEBUG-APK
