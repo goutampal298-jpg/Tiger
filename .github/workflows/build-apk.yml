@@ -1,0 +1,58 @@
+name: Build TIGER APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Extract project ZIP
+        run: |
+          rm -rf project
+          mkdir project
+          unzip -q tiger-ai-creator.zip -d project
+
+      - name: Find Android project
+        shell: bash
+        run: |
+          ANDROID_DIR=$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) -print -quit | xargs -r dirname)
+          if [ -z "$ANDROID_DIR" ]; then
+            echo "Android project not found"
+            exit 1
+          fi
+          echo "ANDROID_DIR=$ANDROID_DIR" >> "$GITHUB_ENV"
+          SDK="${ANDROID_SDK_ROOT:-$ANDROID_HOME}"
+          echo "sdk.dir=$SDK" > "$ANDROID_DIR/local.properties"
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          gradle-version: '8.10'
+
+      - name: Build debug APK
+        shell: bash
+        run: |
+          cd "$ANDROID_DIR"
+          gradle assembleDebug
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: TIGER-AI-DEBUG-APK
+          path: |
+            ${{ env.ANDROID_DIR }}/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
