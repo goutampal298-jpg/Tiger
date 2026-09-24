@@ -43,13 +43,16 @@ jobs:
         with:
           gradle-version: '8.10'
 
-      - name: Build debug APK
+      -       - name: Inspect and Build APK
         shell: bash
         run: |
           cd "$ANDROID_DIR"
+          echo "=== Gradle projects ==="
+          gradle projects
+          echo "=== Assemble tasks ==="
+          gradle tasks --all | grep -i assemble || true
           gradle :app:assembleDebug
-
-      - name: Upload APK
+      -       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: TIGER-AI-DEBUG-APK
